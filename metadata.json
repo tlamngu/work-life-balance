@@ -1,0 +1,5 @@
+{
+  "name": "ENERGY BAR",
+  "description": "A multiplayer realtime team game about work-life balance with an energy bar scoreboard.",
+  "requestFramePermissions": ["camera"]
+}

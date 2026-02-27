@@ -1,0 +1,126 @@
+'use client';
+
+import { useGame } from '@/hooks/useGame';
+import { motion } from 'motion/react';
+import { LuZap, LuCoffee, LuTrophy } from 'react-icons/lu';
+import QRCode from 'react-qr-code';
+
+export default function BoardView({ roomCode }: { roomCode: string }) {
+  const { roomState, isConnected } = useGame(roomCode);
+
+  if (!isConnected || !roomState) return <div className="flex h-screen items-center justify-center p-8 text-orange-950 font-pixel-header text-4xl animate-pulse">CONNECTING...</div>;
+
+  const { teams, round, status } = roomState;
+  const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${roomCode}` : '';
+
+  return (
+    <div className="min-h-screen p-8 text-orange-950 font-pixel-body overflow-hidden flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between mb-12">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 bg-orange-400 border-4 border-black flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <LuZap className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-5xl font-pixel-header text-orange-600 drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            ENERGY BAR
+          </h1>
+        </div>
+        
+        <div className="flex items-center gap-8">
+           {/* QR Code for joining - visible in Lobby */}
+           {status === 'LOBBY' && (
+             <div className="bg-white p-2 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-4 pr-4">
+               <QRCode value={joinUrl} size={64} />
+               <div className="text-left">
+                 <div className="text-xs font-bold text-orange-500 font-pixel-header">SCAN TO JOIN</div>
+                 <div className="text-sm font-pixel-body">play.energybar.game</div>
+               </div>
+             </div>
+           )}
+
+           <div className="text-right">
+             <div className="text-sm font-bold text-orange-500 font-pixel-header">ROOM CODE</div>
+             <div className="text-5xl font-pixel-header text-black">{roomCode}</div>
+           </div>
+           {round && (
+             <div className="px-8 py-4 bg-indigo-500 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+               <div className="text-sm font-bold text-white font-pixel-header mb-1">PHASE</div>
+               <div className="text-3xl font-pixel-header text-white uppercase">{round.phase.replace('_', ' ')}</div>
+             </div>
+           )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 grid gap-8 content-center">
+        {teams.map((team, index) => {
+          const isSpeaker = round?.speakerTeamId === team.id;
+          
+          return (
+            <div key={team.id} className="relative">
+              {/* Team Info */}
+              <div className="flex items-end justify-between mb-2 px-2">
+                <div className="flex items-center gap-4">
+                  <h2 className={`text-3xl font-pixel-header uppercase transition-colors ${isSpeaker ? 'text-orange-600' : 'text-black'}`}>
+                    {team.name}
+                    {isSpeaker && <span className="ml-4 text-sm bg-yellow-400 text-black px-2 py-1 border-2 border-black align-middle animate-pulse">SPEAKER</span>}
+                  </h2>
+                  <span className="text-orange-800 font-pixel-body text-xl">&quot;{team.slogan}&quot;</span>
+                </div>
+                <div className="text-2xl font-pixel-header text-orange-900">
+                  {team.energy}/7
+                </div>
+              </div>
+
+              {/* Bar Container */}
+              <div className="h-16 w-full bg-white border-4 border-black relative shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]">
+                {/* Grid Lines */}
+                <div className="absolute inset-0 grid grid-cols-7 divide-x-4 divide-black z-10 pointer-events-none">
+                  {[...Array(7)].map((_, i) => <div key={i} className="h-full" />)}
+                </div>
+
+                {/* Fill Animation */}
+                <motion.div
+                  className={`h-full ${isSpeaker ? 'bg-yellow-400' : 'bg-indigo-400'}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(team.energy / 7) * 100}%` }}
+                  transition={{ type: 'spring', stiffness: 50, damping: 15 }}
+                />
+                
+                {/* Milestone Markers */}
+                <div className="absolute top-0 left-[42.8%] h-full w-1 bg-transparent z-20 flex flex-col justify-center items-center -ml-px">
+                   <div className="bg-blue-100 p-1 border-2 border-black transform translate-y-[-50%] top-1/2 absolute">
+                     <LuCoffee className="h-4 w-4 text-blue-600" />
+                   </div>
+                </div>
+                <div className="absolute top-0 left-[85.7%] h-full w-1 bg-transparent z-20 flex flex-col justify-center items-center -ml-px">
+                   <div className="bg-yellow-100 p-1 border-2 border-black transform translate-y-[-50%] top-1/2 absolute">
+                     <LuZap className="h-4 w-4 text-yellow-600" />
+                   </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        
+        {teams.length === 0 && (
+          <div className="text-center text-orange-400 text-2xl font-pixel-header">
+            WAITING FOR TEAMS TO JOIN...
+          </div>
+        )}
+      </div>
+      
+      {/* Footer / Timer */}
+      {round?.timer && (
+         <div className="fixed bottom-0 left-0 w-full h-4 bg-black">
+            <motion.div 
+               className="h-full bg-yellow-400"
+               initial={{ width: '100%' }}
+               animate={{ width: '0%' }}
+               transition={{ duration: round.timer.duration / 1000, ease: 'linear' }}
+            />
+         </div>
+      )}
+    </div>
+  );
+}
