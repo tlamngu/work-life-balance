@@ -86,7 +86,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                   animate={{ width: `${(team.energy / 7) * 100}%` }}
                   transition={{ type: 'spring', stiffness: 50, damping: 15 }}
                 />
-                
+
                 {/* Milestone Markers */}
                 <div className="absolute top-0 left-[42.8%] h-full w-1 bg-transparent z-20 flex flex-col justify-center items-center -ml-px">
                    <div className="bg-blue-100 p-1 border-2 border-black transform translate-y-[-50%] top-1/2 absolute">
@@ -102,14 +102,106 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
             </div>
           );
         })}
-        
+
         {teams.length === 0 && (
           <div className="text-center text-orange-400 text-2xl font-pixel-header">
             WAITING FOR TEAMS TO JOIN...
           </div>
         )}
       </div>
-      
+
+      {round?.phase === 'GUESSING' || round?.phase === 'REVEAL' ? (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8 backdrop-blur-sm">
+          <div className="bg-white border-8 border-black p-8 w-full max-w-6xl shadow-[16px_16px_0px_0px_rgba(255,165,0,1)] relative flex flex-col gap-8 max-h-full overflow-y-auto">
+            <h2 className="text-5xl font-pixel-header text-center text-black drop-shadow-[4px_4px_0px_rgba(255,165,0,0.5)]">
+               {round.phase === 'GUESSING' ? 'WHICH STATEMENT IS FAKE?' : 'THE TRUTH REVEALED!'}
+            </h2>
+            
+            <div className="grid grid-cols-3 gap-6 mt-4">
+              {[0, 1, 2].map((idx) => {
+                const statement = round.speakerContent?.statements[idx];
+                const isFake = round.speakerContent?.fakeIndex === idx;
+                const isRevealed = round.phase === 'REVEAL';
+
+                // Find teams that voted for this index
+                const votingTeams = teams.filter(t => t.id !== round.speakerTeamId && round.votes[t.id] === idx);
+
+                return (
+                  <div key={idx} className={`border-4 border-black p-6 flex flex-col items-center justify-start gap-4 transition-all duration-700 relative overflow-hidden ${isRevealed ? (isFake ? 'bg-green-400' : 'bg-red-400') : 'bg-orange-100'}`}>
+                    
+                    <div className={`text-6xl font-pixel-header ${isRevealed ? 'text-black' : 'text-orange-300'}`}>
+                      #{idx + 1}
+                    </div>
+
+                    {isRevealed && statement ? (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-2xl font-pixel-body font-bold text-center text-black p-4 bg-white/50 border-2 border-black rounded"
+                      >
+                        &quot;{statement}&quot;
+                      </motion.div>
+                    ) : (
+                      <div className="text-xl font-pixel-body font-bold text-center text-orange-900/50">
+                        HIDDEN STATEMENT
+                      </div>
+                    )}
+
+                    {isRevealed && (
+                      <motion.div 
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className={`text-3xl font-pixel-header mt-2 ${isFake ? 'text-black' : 'text-white'}`}
+                      >
+                        {isFake ? 'FAKE! (CORRECT)' : 'TRUE (FOOLED)'}
+                      </motion.div>
+                    )}
+
+                    <div className="w-full mt-4 flex-1">
+                      <div className="border-t-4 border-black/20 pt-4 w-full flex flex-wrap justify-center gap-2">
+                        {votingTeams.length === 0 ? (
+                          <div className="font-pixel-body text-black/30">No votes yet</div>
+                        ) : (
+                          votingTeams.map(t => (
+                            <motion.div 
+                              key={t.id}
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="px-4 py-2 bg-indigo-500 border-2 border-black text-white font-pixel-header text-lg"
+                            >
+                              {t.name}
+                            </motion.div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Unrevealed state blind voting team counts to build tension */}
+                    {!isRevealed && round.phase === 'GUESSING' && votingTeams.length > 0 && (
+                       <div className="absolute bottom-2 right-2 text-6xl font-pixel-header text-black/10">
+                          {votingTeams.length}
+                       </div>
+                    )}
+
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-center gap-4">
+               {teams.filter(t => t.id !== round.speakerTeamId).map(t => {
+                   const hasVoted = round.votes[t.id] !== undefined;
+                   return (
+                     <div key={t.id} className={`px-4 py-2 border-2 border-black font-pixel-header text-lg ${hasVoted ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-500 animate-pulse'}`}>
+                       {t.name}: {hasVoted ? 'READY' : 'THINKING...'}
+                     </div>
+                   )
+               })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Footer / Timer */}
       {round?.timer && (
          <div className="fixed bottom-0 left-0 w-full h-4 bg-black">
