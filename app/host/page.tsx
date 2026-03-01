@@ -1,20 +1,30 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { io } from 'socket.io-client';
 import Link from 'next/link';
 import { LuArrowLeft } from 'react-icons/lu';
 
 export default function HostPage() {
   const router = useRouter();
+  const created = useRef(false);
 
   useEffect(() => {
-    const socket = io({ path: '/api/socket' });
-    socket.emit('create_room', (roomCode: string) => {
-      router.push(`/mc/${roomCode}`);
-    });
-    return () => { socket.disconnect(); };
+    if (created.current) return;
+    created.current = true;
+    
+    fetch('/api/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_room' })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.roomCode) {
+          router.push(`/mc/${data.roomCode}`);
+        }
+      })
+      .catch(console.error);
   }, [router]);
 
   return (

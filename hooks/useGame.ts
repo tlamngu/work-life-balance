@@ -1,79 +1,107 @@
 import { useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { RoomState } from '@/types';
 
 export const useGame = (roomCode: string) => {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     if (!roomCode) return;
 
-    // Initialize socket
-    const socketInstance = io({
-      path: '/api/socket',
-      addTrailingSlash: false,
-    });
-    socketRef.current = socketInstance;
-    // eslint-disable-next-line
-    setSocket(socketInstance);
+    const connectSSE = () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
 
-    socketInstance.on('connect', () => {
-      setIsConnected(true);
-      console.log('Connected to socket');
-      socketInstance.emit('join_room', roomCode, (success: boolean) => {
-        if (!success) console.error("Failed to join room");
-      });
-    });
+      const eventSource = new EventSource(`/api/room/${roomCode}/events`);
+      eventSourceRef.current = eventSource;
+      
+      eventSource.onopen = () => {
+        setIsConnected(true);
+        console.log('Connected to SSE');
+      };
 
-    socketInstance.on('disconnect', () => {
-      setIsConnected(false);
-      console.log('Disconnected from socket');
-    });
+      eventSource.onmessage = (event) => {
+        try {
+          const state: RoomState = JSON.parse(event.data);
+          console.log('Received room state:', state);
+          setRoomState(state);
+        } catch (e) {
+          console.error("Failed to parse SSE message", e);
+        }
+      };
 
-    socketInstance.on('room_state', (state: RoomState) => {
-      console.log('Received room state:', state);
-      setRoomState(state);
-    });
+      eventSource.onerror = (error) => {
+        console.error('SSE Error:', error);
+        setIsConnected(false);
+        // It generally auto-reconnects, but we can rely on standard EventSource reconnect
+      };
+    };
+
+    connectSSE();
 
     return () => {
-      socketInstance.disconnect();
-      socketRef.current = null;
-      setSocket(null);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      setIsConnected(false);
     };
   }, [roomCode]);
 
-  const actions = {
-    addTeam: (name: string, slogan: string, callback?: (success: boolean) => void) => {
-      socketRef.current?.emit('add_team', { roomCode, name, slogan }, callback);
-    },
-    startGame: () => {
-      socketRef.current?.emit('start_game', roomCode);
-    },
-    submitStatements: (statements: [string, string, string], fakeIndex: number) => {
-      socketRef.current?.emit('submit_statements', { roomCode, statements, fakeIndex });
-    },
-    castVote: (teamId: string, voteIndex: number) => {
-      socketRef.current?.emit('cast_vote', { roomCode, teamId, voteIndex });
-    },
-    revealFake: () => {
-      socketRef.current?.emit('reveal_fake', roomCode);
-    },
-    applyScores: () => {
-      socketRef.current?.emit('apply_scores', roomCode);
-    },
-    nextRound: () => {
-      socketRef.current?.emit('next_round', roomCode);
-    },
-    useBoost: (sourceTeamId: string, targetTeamId: string) => {
-      socketRef.current?.emit('use_boost', { roomCode, sourceTeamId, targetTeamId });
-    },
-    applyBreakPenalty: (teamId: string) => {
-      socketRef.current?.emit('apply_break_penalty', { roomCode, teamId });
+  const postAction = async (action: string, payload: any = {}) => {
+    try {
+      if (!payload.roomCode && roomCode) {
+        payload.roomCode = roomCode;
+      }
+      const response = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error(`Action ${action} error:`, data.error);
+      }
+      return data;
+    } catch (e) {
+      console.error(`Action ${action} failed:`, e);
+      return { error: e };
     }
   };
 
-  return { roomState, isConnected, actions, socket };
+  const actions = {
+    addTeam: (name: string, slogan: string, callback?: (success: boolean) => void) => {
+      postAction('add_team', { name, slogan }).then(data => {
+        if (callback) callback(data && !data.error && data.success !== false);
+      });
+    },
+    startGame: () => {
+      postAction('start_game');
+    },
+    submitStatements: (statements: [string, string, string], fakeIndex: number) => {
+      postAction('submit_statements', { statements, fakeIndex });
+    },
+    castVote: (teamId: string, voteIndex: number) => {
+      postAction('cast_vote', { teamId, voteIndex });
+    },
+    revealFake: () => {
+      postAction('reveal_fake');
+    },
+    applyScores: () => {
+      postAction('apply_scores');
+    },
+    nextRound: () => {
+      postAction('next_round');
+    },
+    useBoost: (sourceTeamId: string, targetTeamId: string) => {
+      postAction('use_boost', { sourceTeamId, targetTeamId });
+    },
+    applyBreakPenalty: (teamId: string) => {
+      postAction('apply_break_penalty', { teamId });
+    }
+  };
+
+  return { roomState, isConnected, actions, eventSource: eventSourceRef.current };
 };
