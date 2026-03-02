@@ -175,15 +175,19 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
           </div>
         ) : (
           <div className="flex-1 grid gap-4 max-w-md mx-auto w-full">
-            {[0, 1, 2].map(i => (
-              <button
-                key={i}
-                onClick={() => actions.castVote(myTeam.id, i)}
-                className="h-24 bg-white border-4 border-black text-4xl font-pixel-header hover:bg-indigo-500 hover:text-white hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all"
-              >
-                {i + 1}
-              </button>
-            ))}
+            {[0, 1, 2].map(i => {
+              const statement = round.speakerContent?.statements[i];
+              return (
+                <button
+                  key={i}
+                  onClick={() => actions.castVote(myTeam.id, i)}
+                  className="p-4 bg-white border-4 border-black font-pixel-body text-xl hover:bg-indigo-500 hover:text-white hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all flex items-center justify-start text-left gap-4"
+                >
+                  <span className="text-3xl font-pixel-header text-orange-500 min-w-[2rem] text-center">#{i + 1}</span>
+                  <span>{statement ? `"${statement}"` : 'WAITING...'}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

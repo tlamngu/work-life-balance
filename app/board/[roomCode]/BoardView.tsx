@@ -133,7 +133,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                       #{idx + 1}
                     </div>
 
-                    {isRevealed && statement ? (
+                    {statement ? (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -143,7 +143,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                       </motion.div>
                     ) : (
                       <div className="text-xl font-pixel-body font-bold text-center text-orange-900/50">
-                        HIDDEN STATEMENT
+                        WAITING...
                       </div>
                     )}
 
