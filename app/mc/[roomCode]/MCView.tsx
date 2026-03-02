@@ -58,9 +58,18 @@ export default function MCView({ roomCode }: { roomCode: string }) {
               </button>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-lg">TEAMS</div>
-            <div className="text-3xl font-pixel-header">{teams.length}/5</div>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => window.open(`/board/${roomCode}`, 'boardView', 'width=1024,height=768')}
+              className="bg-indigo-500 text-white px-4 py-3 hover:bg-indigo-600 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-2 font-pixel-header whitespace-nowrap"
+              title="Open Presentation Screen (Pop-out Window)"
+            >
+              <LuEye size={20} /> DASHBOARD
+            </button>
+            <div className="text-right">
+              <div className="text-lg">TEAMS</div>
+              <div className="text-3xl font-pixel-header">{teams.length}/5</div>
+            </div>
           </div>
         </header>
 
@@ -140,9 +149,18 @@ export default function MCView({ roomCode }: { roomCode: string }) {
               SPEAKER: {teams.find(t => t.id === round.speakerTeamId)?.name}
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm font-bold text-orange-500 uppercase tracking-wider font-pixel-header">PHASE</div>
-            <div className="text-xl font-bold text-indigo-600 font-pixel-header mt-1">{round.phase}</div>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => window.open(`/board/${roomCode}`, 'boardView', 'width=1024,height=768')}
+              className="bg-indigo-500 text-white px-4 py-3 hover:bg-indigo-600 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-2 font-pixel-header whitespace-nowrap"
+              title="Open Presentation Screen (Pop-out Window)"
+            >
+              <LuEye size={20} /> DASHBOARD
+            </button>
+            <div className="text-right">
+              <div className="text-sm font-bold text-orange-500 uppercase tracking-wider font-pixel-header">PHASE</div>
+              <div className="text-xl font-bold text-indigo-600 font-pixel-header mt-1">{round.phase}</div>
+            </div>
           </div>
         </header>
 
