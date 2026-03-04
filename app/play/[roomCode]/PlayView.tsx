@@ -11,17 +11,40 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   // Speaker Form State
   const [statements, setStatements] = useState(['', '', '']);
   const [fakeIndex, setFakeIndex] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(`energy_bar_team_${roomCode}`);
+    if (roomState?.round?.timer) {
+      const endsAt = roomState.round.timer.phaseEndsAt;
+      const interval = setInterval(() => {
+        const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+        setTimeLeft(remaining);
+      }, 100);
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(null);
+    }
+  }, [roomState?.round?.timer]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(`energy_bar_team_${roomCode}`);
     // eslint-disable-next-line
     if (stored) setMyTeamId(stored);
   }, [roomCode]);
 
   const joinTeam = (teamId: string) => {
     setMyTeamId(teamId);
-    sessionStorage.setItem(`energy_bar_team_${roomCode}`, teamId);
+    localStorage.setItem(`energy_bar_team_${roomCode}`, teamId);
   };
+
+  const createAndJoinTeam = (name: string, slogan: string) => {
+    const newId = Math.random().toString(36).substring(2, 9);
+    actions.addTeam(name, slogan, newId);
+    joinTeam(newId);
+  };
+
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamSlogan, setNewTeamSlogan] = useState('');
 
   if (!isConnected || !roomState) return <div className="flex h-screen items-center justify-center p-6 text-orange-950 font-pixel-header text-xl animate-pulse">CONNECTING...</div>;
 
@@ -31,22 +54,54 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   // 1. Team Selection
   if (!myTeam) {
     return (
-      <div className="min-h-screen p-6 text-orange-950 flex flex-col items-center justify-center">
-        <h1 className="mb-8 text-2xl font-pixel-header text-orange-600 text-center">SELECT YOUR TEAM</h1>
-        <div className="grid w-full max-w-md gap-4">
-          {teams.map(team => (
-            <button
-              key={team.id}
-              onClick={() => joinTeam(team.id)}
-              className="group relative bg-white p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl font-pixel-header text-black">{team.name}</span>
-                <span className="text-lg font-pixel-body text-orange-800">&quot;{team.slogan}&quot;</span>
-              </div>
-            </button>
-          ))}
-          {teams.length === 0 && <div className="text-center text-orange-400 font-pixel-body text-xl">WAITING FOR MC TO ADD TEAMS...</div>}
+      <div className="min-h-screen p-6 text-orange-950 flex flex-col items-center justify-start pt-12 overflow-y-auto">
+        <h1 className="mb-6 text-2xl font-pixel-header text-orange-600 text-center">JOIN OR CREATE TEAM</h1>
+        <div className="flex flex-col w-full max-w-md gap-8 pb-12">
+          
+          <div className="bg-white p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="mb-4 text-xl font-pixel-header">CREATE NEW TEAM</h2>
+            <div className="space-y-4">
+              <input
+                className="w-full bg-orange-50 p-3 text-black placeholder:text-orange-300 border-4 border-black font-pixel-body text-xl focus:outline-none focus:bg-white"
+                placeholder="TEAM NAME"
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+              />
+              <input
+                className="w-full bg-orange-50 p-3 text-black placeholder:text-orange-300 border-4 border-black font-pixel-body text-xl focus:outline-none focus:bg-white"
+                placeholder="SLOGAN"
+                value={newTeamSlogan}
+                onChange={e => setNewTeamSlogan(e.target.value)}
+              />
+              <button
+                onClick={() => {
+                  if (newTeamName && newTeamSlogan) createAndJoinTeam(newTeamName, newTeamSlogan);
+                }}
+                className="w-full bg-indigo-500 p-3 font-pixel-header text-white border-4 border-black hover:bg-indigo-400 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all"
+              >
+                CREATE & JOIN
+              </button>
+            </div>
+          </div>
+
+          <div>
+             <h2 className="mb-4 text-xl font-pixel-header text-center">OR SELECT EXISTING TEAM</h2>
+             <div className="grid gap-4">
+                {teams.map(team => (
+                  <button
+                    key={team.id}
+                    onClick={() => joinTeam(team.id)}
+                    className="group relative bg-white p-6 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-pixel-header text-black">{team.name}</span>
+                      <span className="text-lg font-pixel-body text-orange-800 break-words ml-2">&quot;{team.slogan}&quot;</span>
+                    </div>
+                  </button>
+                ))}
+                {teams.length === 0 && <div className="text-center text-orange-400 font-pixel-body text-lg italic mt-4">NO EXISTING TEAMS YET...</div>}
+             </div>
+          </div>
         </div>
       </div>
     );
@@ -80,7 +135,7 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
         <div className="min-h-screen p-6 text-orange-950">
           <header className="mb-6 text-center">
             <h2 className="text-lg font-pixel-header text-orange-600 mb-2">YOU ARE THE SPEAKER</h2>
-            <p className="text-orange-800 text-lg font-pixel-body">Enter 3 statements. Mark one as FAKE.</p>
+            <p className="text-orange-800 text-lg font-pixel-body">Enter 3 statements. Mark one as FAKE.<br/>{timeLeft !== null && <span className="text-red-600">TIME LEFT: {timeLeft}s</span>}</p>
           </header>
 
           <div className="space-y-6 max-w-md mx-auto">

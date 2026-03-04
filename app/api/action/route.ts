@@ -37,12 +37,9 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case 'add_team': {
-        const { name, slogan } = payload;
-        if (room.teams.length >= 5) {
-          return NextResponse.json({ success: false, error: 'Room full' });
-        }
+        const { name, slogan, id } = payload;
         const newTeam: Team = {
-          id: nanoid(4),
+          id: id || nanoid(4),
           name,
           slogan,
           energy: 0,
@@ -198,13 +195,46 @@ export async function POST(req: NextRequest) {
 
 function startRound(room: RoomState, roundIndex: number) {
   const speakerTeam = room.teams[roundIndex % room.teams.length];
+  const duration = 90 * 1000;
+  
   room.round = {
     index: roundIndex,
     speakerTeamId: speakerTeam.id,
     speakerContent: null,
     phase: 'SPEAKER_PREP',
-    timer: null,
+    timer: {
+      phaseEndsAt: Date.now() + duration,
+      duration
+    },
     votes: {},
     revealed: false
   };
+
+  const roomCode = room.roomCode;
+  setTimeout(() => {
+    const currentRoom = store.rooms.get(roomCode);
+    if (currentRoom && currentRoom.round && currentRoom.round.phase === 'SPEAKER_PREP' && currentRoom.round.index === roundIndex) {
+      currentRoom.round.speakerContent = { 
+        statements: ['I ran out of time...', 'This is an auto-submitted statement.', 'Too slow to type!'], 
+        fakeIndex: 2 
+      };
+      currentRoom.round.phase = 'GUESSING';
+      
+      const guessDuration = 30 * 1000;
+      currentRoom.round.timer = {
+        phaseEndsAt: Date.now() + guessDuration,
+        duration: guessDuration
+      };
+      
+      store.emitRoomUpdate(roomCode);
+
+      setTimeout(() => {
+        const r2 = store.rooms.get(roomCode);
+        if (r2 && r2.round && r2.round.phase === 'GUESSING' && r2.round.index === roundIndex) {
+          r2.round.timer = null;
+          store.emitRoomUpdate(roomCode);
+        }
+      }, guessDuration);
+    }
+  }, duration);
 }

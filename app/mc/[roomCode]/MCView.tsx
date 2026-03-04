@@ -68,7 +68,7 @@ export default function MCView({ roomCode }: { roomCode: string }) {
             </button>
             <div className="text-right">
               <div className="text-lg">TEAMS</div>
-              <div className="text-3xl font-pixel-header">{teams.length}/5</div>
+              <div className="text-3xl font-pixel-header">{teams.length}</div>
             </div>
           </div>
         </header>
@@ -100,7 +100,6 @@ export default function MCView({ roomCode }: { roomCode: string }) {
                       setNewTeamSlogan('');
                     }
                   }}
-                  disabled={teams.length >= 5}
                   className="w-full bg-indigo-500 p-3 font-pixel-header text-white border-4 border-black hover:bg-indigo-400 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all"
                 >
                   ADD TEAM

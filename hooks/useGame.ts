@@ -72,8 +72,8 @@ export const useGame = (roomCode: string) => {
   };
 
   const actions = {
-    addTeam: (name: string, slogan: string, callback?: (success: boolean) => void) => {
-      postAction('add_team', { name, slogan }).then(data => {
+    addTeam: (name: string, slogan: string, id?: string, callback?: (success: boolean) => void) => {
+      postAction('add_team', { name, slogan, id }).then(data => {
         if (callback) callback(data && !data.error && data.success !== false);
       });
     },
@@ -103,5 +103,5 @@ export const useGame = (roomCode: string) => {
     }
   };
 
-  return { roomState, isConnected, actions, eventSource: eventSourceRef.current };
+  return { roomState, isConnected, actions };
 };
