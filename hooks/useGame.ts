@@ -19,13 +19,11 @@ export const useGame = (roomCode: string) => {
       
       eventSource.onopen = () => {
         setIsConnected(true);
-        console.log('Connected to SSE');
       };
 
       eventSource.onmessage = (event) => {
         try {
           const state: RoomState = JSON.parse(event.data);
-          console.log('Received room state:', state);
           setRoomState(state);
         } catch (e) {
           console.error("Failed to parse SSE message", e);
@@ -80,8 +78,8 @@ export const useGame = (roomCode: string) => {
     startGame: () => {
       postAction('start_game');
     },
-    submitStatements: (statements: [string, string, string], fakeIndex: number) => {
-      postAction('submit_statements', { statements, fakeIndex });
+    submitFakeStatement: (fakeIndex: number) => {
+      postAction('submit_fake_statement', { fakeIndex });
     },
     castVote: (teamId: string, voteIndex: number) => {
       postAction('cast_vote', { teamId, voteIndex });

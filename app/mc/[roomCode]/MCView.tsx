@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useGame } from '@/hooks/useGame';
+import { STATEMENT_COUNT } from '@/types';
 import { LuUsers, LuPlay, LuEye, LuArrowRight, LuZap, LuCoffee, LuQrCode, LuX } from 'react-icons/lu';
 import QRCode from 'react-qr-code';
+
+const statementIndexes = Array.from({ length: STATEMENT_COUNT }, (_, index) => index);
 
 export default function MCView({ roomCode }: { roomCode: string }) {
   const { roomState, isConnected, actions } = useGame(roomCode);
@@ -209,7 +212,7 @@ export default function MCView({ roomCode }: { roomCode: string }) {
             
             {round.phase === 'SPEAKER_PREP' && (
                <div className="text-center p-8 text-orange-400 italic font-pixel-body text-xl">
-                 WAITING FOR SPEAKER TO SUBMIT STATEMENTS...
+                 WAITING FOR SPEAKER TO CHOOSE THE FAKE STATEMENT NUMBER...
                </div>
             )}
           </div>
@@ -217,12 +220,12 @@ export default function MCView({ roomCode }: { roomCode: string }) {
           {/* Speaker Content (Hidden until needed, but visible to MC) */}
           {round.speakerContent && (
             <div className="bg-white p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-              <h2 className="mb-4 text-xl font-pixel-header text-black">STATEMENTS (MC VIEW)</h2>
+              <h2 className="mb-4 text-xl font-pixel-header text-black">SPOKEN STATEMENTS (MC VIEW)</h2>
               <div className="space-y-4">
-                {round.speakerContent.statements.map((stmt, idx) => (
+                {statementIndexes.map((idx) => (
                   <div key={idx} className={`p-4 border-4 ${idx === round.speakerContent?.fakeIndex ? 'border-red-500 bg-red-50' : 'border-black bg-orange-50'}`}>
                     <span className="font-pixel-header font-bold mr-4 text-orange-900">#{idx + 1}</span>
-                    <span className="text-xl">{stmt}</span>
+                    <span className="text-xl">STATEMENT #{idx + 1}</span>
                     {idx === round.speakerContent?.fakeIndex && <span className="ml-2 text-sm font-bold text-red-600 font-pixel-header">[FAKE]</span>}
                   </div>
                 ))}

@@ -1,240 +1,267 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { store } from '@/lib/store';
 import { nanoid } from 'nanoid';
-import { RoomState, Team } from '@/types';
+import { Team, STATEMENT_COUNT } from '@/types';
+import {
+  addTeamToRoom,
+  createRoom,
+  isValidStatementIndex,
+  mutateRoom,
+  startRound,
+} from '@/lib/room-service';
 
-// Let's copy the same mutative logic from server.ts to this API route.
+export const runtime = 'nodejs';
+
+const SUPPORTED_ACTIONS = new Set([
+  'create_room',
+  'add_team',
+  'start_game',
+  'submit_fake_statement',
+  'submit_statements',
+  'cast_vote',
+  'reveal_fake',
+  'apply_scores',
+  'next_round',
+  'use_boost',
+  'apply_break_penalty',
+]);
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, payload } = body;
+    const action = body?.action;
+    const payload = body?.payload ?? {};
 
-    if (action === 'create_room') {
-      const roomCode = nanoid(6).toUpperCase();
-      store.rooms.set(roomCode, {
-        roomCode,
-        teams: [],
-        round: null,
-        winnerTeamId: null,
-        createdAt: Date.now(),
-        status: 'LOBBY'
-      });
-      return NextResponse.json({ roomCode });
+    if (!SUPPORTED_ACTIONS.has(action)) {
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
 
-    const { roomCode } = payload;
-    if (!roomCode) {
+    if (action === 'create_room') {
+      const room = await createRoom();
+      return NextResponse.json({ roomCode: room.roomCode });
+    }
+
+    const roomCode = payload.roomCode;
+    if (!roomCode || typeof roomCode !== 'string') {
       return NextResponse.json({ error: 'Missing roomCode' }, { status: 400 });
     }
 
-    const room = store.rooms.get(roomCode);
+    const room = await mutateRoom(roomCode, (currentRoom) => {
+      switch (action) {
+        case 'add_team': {
+          const name = payload.name;
+          const slogan = payload.slogan;
+          const id = payload.id;
+
+          if (typeof name !== 'string' || typeof slogan !== 'string') {
+            return false;
+          }
+
+          const newTeam: Team = {
+            id: typeof id === 'string' && id.length > 0 ? id : nanoid(4),
+            name: name.trim(),
+            slogan: slogan.trim(),
+            energy: 0,
+            powerFlags: { takeBreakAvailable: false, boostAvailable: false },
+          };
+
+          if (!newTeam.name || !newTeam.slogan) {
+            return false;
+          }
+
+          return addTeamToRoom(currentRoom, newTeam);
+        }
+
+        case 'start_game': {
+          if (currentRoom.status !== 'LOBBY' || currentRoom.teams.length < 2) {
+            return false;
+          }
+
+          currentRoom.status = 'PLAYING';
+          currentRoom.winnerTeamId = null;
+          startRound(currentRoom, 0);
+          return true;
+        }
+
+        case 'submit_fake_statement':
+        case 'submit_statements': {
+          if (!currentRoom.round || currentRoom.round.phase !== 'SPEAKER_PREP') {
+            return false;
+          }
+
+          const fakeIndex = payload.fakeIndex;
+          if (!isValidStatementIndex(fakeIndex)) {
+            return false;
+          }
+
+          const duration = 30 * 1000;
+          currentRoom.round.speakerContent = {
+            statementCount: STATEMENT_COUNT,
+            fakeIndex,
+          };
+          currentRoom.round.phase = 'GUESSING';
+          currentRoom.round.timer = {
+            phaseEndsAt: Date.now() + duration,
+            duration,
+          };
+          currentRoom.round.revealed = false;
+          currentRoom.round.votes = {};
+
+          return true;
+        }
+
+        case 'cast_vote': {
+          if (!currentRoom.round || currentRoom.round.phase !== 'GUESSING') {
+            return false;
+          }
+
+          const teamId = payload.teamId;
+          const voteIndex = payload.voteIndex;
+
+          if (typeof teamId !== 'string' || !isValidStatementIndex(voteIndex)) {
+            return false;
+          }
+
+          if (teamId === currentRoom.round.speakerTeamId) {
+            return false;
+          }
+
+          const isKnownTeam = currentRoom.teams.some((team) => team.id === teamId);
+          if (!isKnownTeam) {
+            return false;
+          }
+
+          currentRoom.round.votes[teamId] = voteIndex;
+          return true;
+        }
+
+        case 'reveal_fake': {
+          if (!currentRoom.round || currentRoom.round.phase !== 'GUESSING' || !currentRoom.round.speakerContent) {
+            return false;
+          }
+
+          currentRoom.round.phase = 'REVEAL';
+          currentRoom.round.revealed = true;
+          currentRoom.round.timer = null;
+          return true;
+        }
+
+        case 'apply_scores': {
+          if (!currentRoom.round || currentRoom.round.phase !== 'REVEAL' || !currentRoom.round.speakerContent) {
+            return false;
+          }
+
+          const fakeIndex = currentRoom.round.speakerContent.fakeIndex;
+
+          let fooledCount = 0;
+          const guessingTeams = currentRoom.teams.filter(
+            (team) => team.id !== currentRoom.round?.speakerTeamId,
+          );
+
+          guessingTeams.forEach((team) => {
+            const vote = currentRoom.round?.votes[team.id];
+            if (vote === fakeIndex) {
+              team.energy = Math.min(7, team.energy + 1);
+            } else {
+              fooledCount += 1;
+            }
+          });
+
+          if (fooledCount >= 2) {
+            const speakerTeam = currentRoom.teams.find(
+              (team) => team.id === currentRoom.round?.speakerTeamId,
+            );
+
+            if (speakerTeam) {
+              speakerTeam.energy = Math.min(7, speakerTeam.energy + 1);
+            }
+          }
+
+          currentRoom.teams.forEach((team) => {
+            if (team.energy >= 3) {
+              team.powerFlags.takeBreakAvailable = true;
+            }
+            if (team.energy >= 6) {
+              team.powerFlags.boostAvailable = true;
+            }
+          });
+
+          const winner = currentRoom.teams.find((team) => team.energy >= 7);
+          if (winner) {
+            currentRoom.winnerTeamId = winner.id;
+            currentRoom.status = 'ENDED';
+            currentRoom.round.phase = 'GAME_OVER';
+          } else {
+            currentRoom.round.phase = 'SCORED';
+          }
+
+          currentRoom.round.timer = null;
+          return true;
+        }
+
+        case 'next_round': {
+          if (!currentRoom.round || currentRoom.status !== 'PLAYING') {
+            return false;
+          }
+
+          const nextRoundNum = currentRoom.round.index + 1;
+          startRound(currentRoom, nextRoundNum);
+          return true;
+        }
+
+        case 'use_boost': {
+          const sourceTeamId = payload.sourceTeamId;
+          const targetTeamId = payload.targetTeamId;
+
+          if (typeof sourceTeamId !== 'string' || typeof targetTeamId !== 'string') {
+            return false;
+          }
+
+          const sourceTeam = currentRoom.teams.find((team) => team.id === sourceTeamId);
+          const targetTeam = currentRoom.teams.find((team) => team.id === targetTeamId);
+
+          if (
+            sourceTeam &&
+            targetTeam &&
+            sourceTeam.id !== targetTeam.id &&
+            sourceTeam.powerFlags.boostAvailable &&
+            targetTeam.energy > 0
+          ) {
+            sourceTeam.energy = Math.min(7, sourceTeam.energy + 1);
+            targetTeam.energy = Math.max(0, targetTeam.energy - 1);
+            sourceTeam.powerFlags.boostAvailable = false;
+            return true;
+          }
+
+          return false;
+        }
+
+        case 'apply_break_penalty': {
+          const teamId = payload.teamId;
+          if (typeof teamId !== 'string') {
+            return false;
+          }
+
+          const team = currentRoom.teams.find((candidate) => candidate.id === teamId);
+          if (team && team.powerFlags.takeBreakAvailable) {
+            team.energy = Math.max(0, team.energy - 1);
+            team.powerFlags.takeBreakAvailable = false;
+            return true;
+          }
+
+          return false;
+        }
+      }
+
+      return false;
+    });
+
     if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    let changed = false;
-
-    switch (action) {
-      case 'add_team': {
-        const { name, slogan, id } = payload;
-        const newTeam: Team = {
-          id: id || nanoid(4),
-          name,
-          slogan,
-          energy: 0,
-          powerFlags: { takeBreakAvailable: false, boostAvailable: false }
-        };
-        room.teams.push(newTeam);
-        changed = true;
-        break;
-      }
-
-      case 'start_game': {
-        if (room.teams.length < 2) break;
-        room.status = 'PLAYING';
-        startRound(room, 0);
-        changed = true;
-        break;
-      }
-
-      case 'submit_statements': {
-        if (!room.round) break;
-        const { statements, fakeIndex } = payload;
-        room.round.speakerContent = { statements, fakeIndex };
-        room.round.phase = 'GUESSING';
-        
-        const duration = 30 * 1000;
-        room.round.timer = {
-          phaseEndsAt: Date.now() + duration,
-          duration
-        };
-        changed = true;
-
-        // Note: For SSE, we simulate the auto-advance logic by checking if there's an ongoing timer
-        // If we want a server-side timeout, we can set a timeout here, but since Vercel API routes 
-        // are stateless and auto-kill, a simple setTimeout won't always execute cleanly on serverless.
-        // For standard node environment, it handles fine. Let's replicate this.
-        setTimeout(() => {
-          const currentRoom = store.rooms.get(roomCode);
-          if (currentRoom && currentRoom.round && currentRoom.round.phase === 'GUESSING') {
-            currentRoom.round.timer = null;
-            store.emitRoomUpdate(roomCode);
-          }
-        }, duration);
-
-        break;
-      }
-
-      case 'cast_vote': {
-        if (!room.round || room.round.phase !== 'GUESSING') break;
-        const { teamId, voteIndex } = payload;
-        room.round.votes[teamId] = voteIndex;
-        changed = true;
-        break;
-      }
-
-      case 'reveal_fake': {
-        if (!room.round) break;
-        room.round.phase = 'REVEAL';
-        room.round.revealed = true;
-        changed = true;
-        break;
-      }
-
-      case 'apply_scores': {
-        if (!room.round || room.round.phase !== 'REVEAL') break;
-        const fakeIndex = room.round.speakerContent?.fakeIndex;
-        if (fakeIndex === undefined) break;
-
-        let fooledCount = 0;
-        const guessingTeams = room.teams.filter(t => t.id !== room.round?.speakerTeamId);
-
-        guessingTeams.forEach(team => {
-          const vote = room.round?.votes[team.id];
-          if (vote === fakeIndex) {
-            team.energy = Math.min(7, team.energy + 1);
-          } else {
-            fooledCount++;
-          }
-        });
-
-        if (fooledCount >= 2) {
-          const speakerTeam = room.teams.find(t => t.id === room.round?.speakerTeamId);
-          if (speakerTeam) {
-            speakerTeam.energy = Math.min(7, speakerTeam.energy + 1);
-          }
-        }
-
-        room.teams.forEach(team => {
-          if (team.energy >= 3) team.powerFlags.takeBreakAvailable = true;
-          if (team.energy >= 6) team.powerFlags.boostAvailable = true;
-        });
-
-        const winner = room.teams.find(t => t.energy >= 7);
-        if (winner) {
-          room.winnerTeamId = winner.id;
-          room.status = 'ENDED';
-          room.round.phase = 'GAME_OVER';
-        } else {
-          room.round.phase = 'SCORED';
-        }
-
-        changed = true;
-        break;
-      }
-
-      case 'next_round': {
-        if (!room.round) break;
-        const nextRoundNum = room.round.index + 1;
-        startRound(room, nextRoundNum);
-        changed = true;
-        break;
-      }
-
-      case 'use_boost': {
-        const { sourceTeamId, targetTeamId } = payload;
-        const sourceTeam = room.teams.find(t => t.id === sourceTeamId);
-        const targetTeam = room.teams.find(t => t.id === targetTeamId);
-        
-        if (sourceTeam && targetTeam && sourceTeam.powerFlags.boostAvailable && targetTeam.energy > 0) {
-          sourceTeam.energy = Math.min(7, sourceTeam.energy + 1);
-          targetTeam.energy = Math.max(0, targetTeam.energy - 1);
-          sourceTeam.powerFlags.boostAvailable = false;
-          changed = true;
-        }
-        break;
-      }
-
-      case 'apply_break_penalty': {
-        const { teamId } = payload;
-        const team = room.teams.find(t => t.id === teamId);
-        if (team && team.powerFlags.takeBreakAvailable) {
-          team.energy = Math.max(0, team.energy - 1);
-          team.powerFlags.takeBreakAvailable = false;
-          changed = true;
-        }
-        break;
-      }
-
-      default:
-        return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
-    }
-
-    if (changed) {
-      store.emitRoomUpdate(roomCode);
-    }
-
     return NextResponse.json({ success: true, room });
-
   } catch (error) {
     console.error('Error in API route:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-}
-
-function startRound(room: RoomState, roundIndex: number) {
-  const speakerTeam = room.teams[roundIndex % room.teams.length];
-  const duration = 90 * 1000;
-  
-  room.round = {
-    index: roundIndex,
-    speakerTeamId: speakerTeam.id,
-    speakerContent: null,
-    phase: 'SPEAKER_PREP',
-    timer: {
-      phaseEndsAt: Date.now() + duration,
-      duration
-    },
-    votes: {},
-    revealed: false
-  };
-
-  const roomCode = room.roomCode;
-  setTimeout(() => {
-    const currentRoom = store.rooms.get(roomCode);
-    if (currentRoom && currentRoom.round && currentRoom.round.phase === 'SPEAKER_PREP' && currentRoom.round.index === roundIndex) {
-      currentRoom.round.speakerContent = { 
-        statements: ['I ran out of time...', 'This is an auto-submitted statement.', 'Too slow to type!'], 
-        fakeIndex: 2 
-      };
-      currentRoom.round.phase = 'GUESSING';
-      
-      const guessDuration = 30 * 1000;
-      currentRoom.round.timer = {
-        phaseEndsAt: Date.now() + guessDuration,
-        duration: guessDuration
-      };
-      
-      store.emitRoomUpdate(roomCode);
-
-      setTimeout(() => {
-        const r2 = store.rooms.get(roomCode);
-        if (r2 && r2.round && r2.round.phase === 'GUESSING' && r2.round.index === roundIndex) {
-          r2.round.timer = null;
-          store.emitRoomUpdate(roomCode);
-        }
-      }, guessDuration);
-    }
-  }, duration);
 }

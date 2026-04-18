@@ -1,35 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGame } from '@/hooks/useGame';
-import { LuCheck, LuX, LuClock, LuZap } from 'react-icons/lu';
+import { STATEMENT_COUNT } from '@/types';
+import { LuCheck, LuX, LuZap } from 'react-icons/lu';
+
+const statementIndexes = Array.from({ length: STATEMENT_COUNT }, (_, index) => index);
 
 export default function PlayView({ roomCode }: { roomCode: string }) {
   const { roomState, isConnected, actions } = useGame(roomCode);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
 
-  // Speaker Form State
-  const [statements, setStatements] = useState(['', '', '']);
-  const [fakeIndex, setFakeIndex] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (roomState?.round?.timer) {
-      const endsAt = roomState.round.timer.phaseEndsAt;
-      const interval = setInterval(() => {
-        const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
-        setTimeLeft(remaining);
-      }, 100);
-      return () => clearInterval(interval);
-    } else {
-      setTimeLeft(null);
-    }
-  }, [roomState?.round?.timer]);
+  // Speaker Selection State
+  const [selectedFakeChoice, setSelectedFakeChoice] = useState<{ roundIndex: number; fakeIndex: number } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(`energy_bar_team_${roomCode}`);
-    // eslint-disable-next-line
-    if (stored) setMyTeamId(stored);
+    if (!stored) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setMyTeamId(stored);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
   }, [roomCode]);
 
   const joinTeam = (teamId: string) => {
@@ -49,6 +44,11 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   if (!isConnected || !roomState) return <div className="flex h-screen items-center justify-center p-6 text-orange-950 font-pixel-header text-xl animate-pulse">CONNECTING...</div>;
 
   const { teams, round, status } = roomState;
+  const currentRoundIndex = round?.index ?? -1;
+  const selectedFakeIndex = selectedFakeChoice && selectedFakeChoice.roundIndex === currentRoundIndex
+    ? selectedFakeChoice.fakeIndex
+    : null;
+
   const myTeam = teams.find(t => t.id === myTeamId);
 
   // 1. Team Selection
@@ -135,39 +135,43 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
         <div className="min-h-screen p-6 text-orange-950">
           <header className="mb-6 text-center">
             <h2 className="text-lg font-pixel-header text-orange-600 mb-2">YOU ARE THE SPEAKER</h2>
-            <p className="text-orange-800 text-lg font-pixel-body">Enter 3 statements. Mark one as FAKE.<br/>{timeLeft !== null && <span className="text-red-600">TIME LEFT: {timeLeft}s</span>}</p>
+            <p className="text-orange-800 text-lg font-pixel-body">
+              Speak 4 statements out loud in the real world.<br />
+              Pick which statement number is fake, then submit.
+            </p>
           </header>
 
           <div className="space-y-6 max-w-md mx-auto">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="relative">
-                <textarea
-                  value={statements[i]}
-                  onChange={e => {
-                    const newStmts = [...statements];
-                    newStmts[i] = e.target.value;
-                    setStatements(newStmts);
-                  }}
-                  placeholder={`STATEMENT #${i + 1}`}
-                  className={`w-full h-24 bg-white p-4 text-xl font-pixel-body placeholder:text-orange-300 focus:outline-none border-4 transition-all ${fakeIndex === i ? 'border-red-500 bg-red-50' : 'border-black'}`}
-                />
-                <button
-                  onClick={() => setFakeIndex(i)}
-                  className={`absolute bottom-2 right-2 px-3 py-1 border-2 border-black text-xs font-pixel-header transition-colors ${fakeIndex === i ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
-                >
-                  {fakeIndex === i ? 'FAKE' : 'MARK FAKE'}
-                </button>
-              </div>
-            ))}
+            <div className="grid grid-cols-2 gap-4">
+              {statementIndexes.map((index) => {
+                const isSelected = selectedFakeIndex === index;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedFakeChoice({ roundIndex: round.index, fakeIndex: index })}
+                    className={`h-24 border-4 font-pixel-header text-3xl transition-all ${
+                      isSelected
+                        ? 'bg-red-500 text-white border-black -translate-y-1 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'
+                        : 'bg-white text-black border-black hover:bg-orange-100 hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]'
+                    }`}
+                  >
+                    #{index + 1}
+                  </button>
+                );
+              })}
+            </div>
             
             <button
-              disabled={statements.some(s => s.length < 5) || fakeIndex === null}
+              disabled={selectedFakeIndex === null}
               onClick={() => {
-                 if (fakeIndex !== null) actions.submitStatements(statements as [string,string,string], fakeIndex);
+                if (selectedFakeIndex !== null) {
+                  setSelectedFakeChoice(null);
+                  actions.submitFakeStatement(selectedFakeIndex);
+                }
               }}
               className="w-full h-16 bg-yellow-400 text-xl font-pixel-header text-black border-4 border-black hover:bg-yellow-300 hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              LOCK IN
+              SUBMIT FAKE CHOICE
             </button>
             <p className="text-center text-sm text-orange-600 font-pixel-body mt-4">
               TIP: KEEP A POKER FACE! DON&apos;T LET THEM GUESS.
@@ -181,13 +185,16 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
       <div className="min-h-screen p-6 text-orange-950 flex flex-col items-center justify-center text-center">
         <h1 className="text-2xl font-pixel-header mb-6">READ THEM OUT LOUD!</h1>
         <div className="space-y-4 w-full max-w-md text-left">
-           {round.speakerContent?.statements.map((s, i) => (
-             <div key={i} className={`p-4 bg-white border-4 ${i === round.speakerContent?.fakeIndex ? 'border-red-500' : 'border-black'}`}>
-               <span className="font-pixel-header font-bold mr-3 text-orange-500">#{i+1}</span>
-               <span className="font-pixel-body text-xl">{s}</span>
-               {i === round.speakerContent?.fakeIndex && <span className="ml-2 text-xs text-red-500 font-pixel-header">[FAKE]</span>}
-             </div>
-           ))}
+          {statementIndexes.map((index) => {
+            const isFake = round.speakerContent?.fakeIndex === index;
+            return (
+              <div key={index} className={`p-4 bg-white border-4 ${isFake ? 'border-red-500' : 'border-black'}`}>
+                <span className="font-pixel-header font-bold mr-3 text-orange-500">#{index + 1}</span>
+                <span className="font-pixel-body text-xl">STATEMENT #{index + 1}</span>
+                {isFake && <span className="ml-2 text-xs text-red-500 font-pixel-header">[FAKE]</span>}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-8 p-4 bg-orange-100 border-4 border-black text-orange-800 font-pixel-body text-lg">
           WAIT FOR TEAMS TO VOTE...
@@ -230,19 +237,16 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
           </div>
         ) : (
           <div className="flex-1 grid gap-4 max-w-md mx-auto w-full">
-            {[0, 1, 2].map(i => {
-              const statement = round.speakerContent?.statements[i];
-              return (
-                <button
-                  key={i}
-                  onClick={() => actions.castVote(myTeam.id, i)}
-                  className="p-4 bg-white border-4 border-black font-pixel-body text-xl hover:bg-indigo-500 hover:text-white hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all flex items-center justify-start text-left gap-4"
-                >
-                  <span className="text-3xl font-pixel-header text-orange-500 min-w-[2rem] text-center">#{i + 1}</span>
-                  <span>{statement ? `"${statement}"` : 'WAITING...'}</span>
-                </button>
-              );
-            })}
+            {statementIndexes.map((index) => (
+              <button
+                key={index}
+                onClick={() => actions.castVote(myTeam.id, index)}
+                className="p-4 bg-white border-4 border-black font-pixel-body text-xl hover:bg-indigo-500 hover:text-white hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all flex items-center justify-start text-left gap-4"
+              >
+                <span className="text-3xl font-pixel-header text-orange-500 min-w-[2rem] text-center">#{index + 1}</span>
+                <span>STATEMENT #{index + 1}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -252,7 +256,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   if (round.phase === 'REVEAL' || round.phase === 'SCORED') {
     const myVote = round.votes[myTeam.id];
     const correctFake = round.speakerContent?.fakeIndex;
-    const isCorrect = myVote === correctFake;
+    const hasVoted = myVote !== undefined;
+    const isCorrect = hasVoted && myVote === correctFake;
 
     return (
       <div className="min-h-screen p-6 text-orange-950 flex flex-col items-center justify-center text-center">
@@ -269,7 +274,7 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
         </div>
         
         <h2 className="text-4xl font-pixel-header mb-4 text-black">
-          {isCorrect ? 'CORRECT!' : 'WRONG!'}
+          {!hasVoted ? 'NO VOTE' : isCorrect ? 'CORRECT!' : 'WRONG!'}
         </h2>
         <p className="text-2xl text-orange-800 mb-8 font-pixel-body">
           THE FAKE WAS STATEMENT #{correctFake !== undefined ? correctFake + 1 : '?'}

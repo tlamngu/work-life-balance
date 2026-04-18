@@ -1,9 +1,12 @@
 'use client';
 
 import { useGame } from '@/hooks/useGame';
+import { STATEMENT_COUNT } from '@/types';
 import { motion } from 'motion/react';
-import { LuZap, LuCoffee, LuTrophy } from 'react-icons/lu';
+import { LuZap, LuCoffee } from 'react-icons/lu';
 import QRCode from 'react-qr-code';
+
+const statementIndexes = Array.from({ length: STATEMENT_COUNT }, (_, index) => index);
 
 export default function BoardView({ roomCode }: { roomCode: string }) {
   const { roomState, isConnected } = useGame(roomCode);
@@ -53,7 +56,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
 
       {/* Main Content */}
       <div className="flex-1 grid gap-8 content-center">
-        {teams.map((team, index) => {
+        {teams.map((team) => {
           const isSpeaker = round?.speakerTeamId === team.id;
           
           return (
@@ -117,9 +120,8 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                {round.phase === 'GUESSING' ? 'WHICH STATEMENT IS FAKE?' : 'THE TRUTH REVEALED!'}
             </h2>
             
-            <div className="grid grid-cols-3 gap-6 mt-4">
-              {[0, 1, 2].map((idx) => {
-                const statement = round.speakerContent?.statements[idx];
+            <div className="grid grid-cols-2 gap-6 mt-4">
+              {statementIndexes.map((idx) => {
                 const isFake = round.speakerContent?.fakeIndex === idx;
                 const isRevealed = round.phase === 'REVEAL';
 
@@ -133,19 +135,13 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                       #{idx + 1}
                     </div>
 
-                    {statement ? (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="text-2xl font-pixel-body font-bold text-center text-black p-4 bg-white/50 border-2 border-black rounded"
-                      >
-                        &quot;{statement}&quot;
-                      </motion.div>
-                    ) : (
-                      <div className="text-xl font-pixel-body font-bold text-center text-orange-900/50">
-                        WAITING...
-                      </div>
-                    )}
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-2xl font-pixel-body font-bold text-center text-black p-4 bg-white/50 border-2 border-black rounded"
+                    >
+                      STATEMENT #{idx + 1}
+                    </motion.div>
 
                     {isRevealed && (
                       <motion.div 

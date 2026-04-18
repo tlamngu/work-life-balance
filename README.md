@@ -1,20 +1,70 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ENERGY BAR
 
-# Run and deploy your AI Studio app
+Multiplayer party game about work-life balance, built with Next.js.
 
-This contains everything you need to run your app locally.
+## Updated gameplay
 
-View your app in AI Studio: https://ai.studio/apps/00c7bcc2-bcd1-4aa2-a566-cbe79134a399
+- Speaker flow:
+  - Speak statements in real life.
+  - Select which statement number is fake.
+  - Submit fake choice.
+- Voter flow:
+  - Pick `1`, `2`, `3`, or `4` (statement index).
 
-## Run Locally
+## Reliability model
 
-**Prerequisites:**  Node.js
+The app now runs with stateless API processing and persistent MongoDB storage:
 
+- Room and round state is stored in MongoDB, not in process memory.
+- Phase timing (`SPEAKER_PREP`, `GUESSING`) is advanced from timestamps on read/mutation.
+- No game-critical `setTimeout` state transitions are used.
+
+## Environment variables
+
+Copy [.env.example](.env.example) to `.env.local` and set:
+
+- `MONGODB_URI` (for local: `mongodb://localhost:27017/energy_bar`)
+- `MONGODB_DB` (default: `energy_bar`)
+
+Optional existing vars:
+
+- `GEMINI_API_KEY`
+- `APP_URL`
+
+## Run locally (Node + Mongo)
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   - `npm install`
+2. Start MongoDB (example with Docker):
+   - `docker run --name energy-bar-mongo -p 27017:27017 -d mongo:7`
+3. Start Next.js:
+   - `npm run dev`
+4. Open:
+   - `http://localhost:3000`
+
+## Run full stack with Docker Compose
+
+1. Build and start:
+   - `docker compose up --build`
+2. Open app:
+   - `http://localhost:3000`
+3. Stop:
+   - `docker compose down`
+
+Mongo data is persisted in the `mongo_data` volume.
+
+Notes:
+
+- In Docker Compose mode, MongoDB is internal to the compose network (not exposed on host port 27017), which avoids common port-collision startup failures.
+
+## Troubleshooting Mongo startup
+
+- If you see "permission denied while trying to connect to the docker API":
+  - Run with sudo: `sudo docker compose up --build`
+  - Or add your user to docker group, then re-login:
+    - `sudo usermod -aG docker $USER`
+
+- If you still see healthcheck failures:
+  - Run: `docker compose logs mongo --tail=200`
+  - Run: `docker compose ps`
+  - Share the output to diagnose the exact cause.
