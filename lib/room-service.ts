@@ -35,6 +35,8 @@ async function getRoomsCollection(): Promise<Collection<RoomDocument>> {
 }
 
 function cloneRoomFromDoc(doc: WithId<RoomDocument>): RoomState {
+  const breakTargets = doc.round?.breakTargets ?? {};
+
   return {
     roomCode: doc.roomCode,
     teams: doc.teams.map((team) => ({
@@ -55,6 +57,7 @@ function cloneRoomFromDoc(doc: WithId<RoomDocument>): RoomState {
               }
             : null,
           votes: { ...doc.round.votes },
+          breakTargets: { ...breakTargets },
         }
       : null,
     winnerTeamId: doc.winnerTeamId,
@@ -84,6 +87,7 @@ export function startRound(room: RoomState, roundIndex: number) {
       duration: SPEAKER_PREP_DURATION_MS,
     },
     votes: {},
+    breakTargets: {},
     revealed: false,
   };
 }

@@ -96,7 +96,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                      <LuCoffee className="h-4 w-4 text-blue-600" />
                    </div>
                 </div>
-                <div className="absolute top-0 left-[85.7%] h-full w-1 bg-transparent z-20 flex flex-col justify-center items-center -ml-px">
+                <div className="absolute top-0 left-[71.4%] h-full w-1 bg-transparent z-20 flex flex-col justify-center items-center -ml-px">
                    <div className="bg-yellow-100 p-1 border-2 border-black transform translate-y-[-50%] top-1/2 absolute">
                      <LuZap className="h-4 w-4 text-yellow-600" />
                    </div>

@@ -84,6 +84,9 @@ export const useGame = (roomCode: string) => {
     castVote: (teamId: string, voteIndex: number) => {
       postAction('cast_vote', { teamId, voteIndex });
     },
+    setBreakTarget: (sourceTeamId: string, targetTeamId: string) => {
+      postAction('set_break_target', { sourceTeamId, targetTeamId });
+    },
     revealFake: () => {
       postAction('reveal_fake');
     },
@@ -95,9 +98,6 @@ export const useGame = (roomCode: string) => {
     },
     useBoost: (sourceTeamId: string, targetTeamId: string) => {
       postAction('use_boost', { sourceTeamId, targetTeamId });
-    },
-    applyBreakPenalty: (teamId: string) => {
-      postAction('apply_break_penalty', { teamId });
     }
   };
 

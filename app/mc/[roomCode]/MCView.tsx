@@ -236,38 +236,29 @@ export default function MCView({ roomCode }: { roomCode: string }) {
           {/* Powers Panel */}
           <div className="bg-white p-6 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
              <h2 className="mb-4 text-xl font-pixel-header text-black">POWERS</h2>
+             <p className="text-sm font-pixel-body text-orange-700 mb-4">
+               Teams now control BREAK and BOOST from their own device. Monitor readiness and locked BREAK targets here.
+             </p>
+
              <div className="grid grid-cols-2 gap-4">
-                {teams.map(team => (
-                  <div key={team.id} className="p-3 bg-orange-50 border-4 border-black">
-                    <div className="font-pixel-header mb-2 text-sm">{team.name} ({team.energy})</div>
-                    <div className="flex gap-2">
-                      <button 
-                        disabled={!team.powerFlags.takeBreakAvailable}
-                        onClick={() => {
-                          if (confirm(`Use "Take a Break" on ${team.name}? If they answer WRONG, they lose 1 energy.`)) {
-                             if (confirm("Did they answer WRONG? (Click OK to deduct energy, Cancel if they got it right)")) {
-                               actions.applyBreakPenalty(team.id);
-                             }
-                          }
-                        }}
-                        className="flex-1 py-2 bg-blue-100 text-blue-800 border-2 border-black text-xs font-bold font-pixel-header disabled:opacity-50 disabled:bg-gray-100 disabled:text-gray-400 hover:bg-blue-200 transition-colors"
-                      >
-                        <LuCoffee className="inline mr-1"/> BREAK
-                      </button>
-                      <button 
-                        disabled={!team.powerFlags.boostAvailable}
-                        onClick={() => {
-                           // Simple prompt for MVP
-                           const target = prompt("Enter target team ID to steal from:");
-                           if (target) actions.useBoost(team.id, target);
-                        }}
-                        className="flex-1 py-2 bg-yellow-100 text-yellow-800 border-2 border-black text-xs font-bold font-pixel-header disabled:opacity-50 disabled:bg-gray-100 disabled:text-gray-400 hover:bg-yellow-200 transition-colors"
-                      >
-                        <LuZap className="inline mr-1"/> BOOST
-                      </button>
+                {teams.map((team) => {
+                  const breakTargetId = round.breakTargets?.[team.id];
+                  const breakTargetTeam = teams.find((candidate) => candidate.id === breakTargetId);
+
+                  return (
+                    <div key={team.id} className="p-3 bg-orange-50 border-4 border-black">
+                      <div className="font-pixel-header mb-2 text-sm">{team.name} ({team.energy})</div>
+                      <div className="space-y-2 text-xs font-pixel-header">
+                        <div className={`border-2 border-black px-2 py-1 ${team.powerFlags.takeBreakAvailable ? 'bg-blue-200 text-blue-900' : 'bg-gray-200 text-gray-600'}`}>
+                          <LuCoffee className="inline mr-1" /> BREAK: {breakTargetTeam ? `LOCKED -> ${breakTargetTeam.name}` : team.powerFlags.takeBreakAvailable ? 'READY' : 'UNAVAILABLE'}
+                        </div>
+                        <div className={`border-2 border-black px-2 py-1 ${team.powerFlags.boostAvailable ? 'bg-yellow-200 text-yellow-900' : 'bg-gray-200 text-gray-600'}`}>
+                          <LuZap className="inline mr-1" /> BOOST: {team.powerFlags.boostAvailable ? 'READY' : 'UNAVAILABLE'}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
              </div>
           </div>
         </div>

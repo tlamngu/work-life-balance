@@ -18,11 +18,11 @@ const SUPPORTED_ACTIONS = new Set([
   'submit_fake_statement',
   'submit_statements',
   'cast_vote',
+  'set_break_target',
   'reveal_fake',
   'apply_scores',
   'next_round',
   'use_boost',
-  'apply_break_penalty',
 ]);
 
 export async function POST(req: NextRequest) {
@@ -134,6 +134,43 @@ export async function POST(req: NextRequest) {
           return true;
         }
 
+        case 'set_break_target': {
+          if (!currentRoom.round || currentRoom.round.phase !== 'GUESSING') {
+            return false;
+          }
+
+          const sourceTeamId = payload.sourceTeamId;
+          const targetTeamId = payload.targetTeamId;
+
+          if (typeof sourceTeamId !== 'string' || typeof targetTeamId !== 'string') {
+            return false;
+          }
+
+          const sourceTeam = currentRoom.teams.find((team) => team.id === sourceTeamId);
+          const targetTeam = currentRoom.teams.find((team) => team.id === targetTeamId);
+
+          if (!sourceTeam || !targetTeam || sourceTeam.id === targetTeam.id) {
+            return false;
+          }
+
+          const nextSpeakerTeam = currentRoom.teams[(currentRoom.round.index + 1) % currentRoom.teams.length];
+          if (targetTeam.id === nextSpeakerTeam.id) {
+            return false;
+          }
+
+          if (!sourceTeam.powerFlags.takeBreakAvailable) {
+            return false;
+          }
+
+          if (currentRoom.round.breakTargets[sourceTeam.id]) {
+            return false;
+          }
+
+          currentRoom.round.breakTargets[sourceTeam.id] = targetTeam.id;
+          sourceTeam.powerFlags.takeBreakAvailable = false;
+          return true;
+        }
+
         case 'reveal_fake': {
           if (!currentRoom.round || currentRoom.round.phase !== 'GUESSING' || !currentRoom.round.speakerContent) {
             return false;
@@ -176,11 +213,25 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          const breakTargets = currentRoom.round.breakTargets ?? {};
+          for (const [sourceTeamId, targetTeamId] of Object.entries(breakTargets)) {
+            const sourceTeam = currentRoom.teams.find((team) => team.id === sourceTeamId);
+            const targetTeam = currentRoom.teams.find((team) => team.id === targetTeamId);
+            if (!sourceTeam || !targetTeam) {
+              continue;
+            }
+
+            const targetVote = currentRoom.round.votes[targetTeam.id];
+            if (targetVote !== undefined && targetVote !== fakeIndex) {
+              targetTeam.energy = Math.max(0, targetTeam.energy - 1);
+            }
+          }
+
           currentRoom.teams.forEach((team) => {
             if (team.energy >= 3) {
               team.powerFlags.takeBreakAvailable = true;
             }
-            if (team.energy >= 6) {
+            if (team.energy >= 5) {
               team.powerFlags.boostAvailable = true;
             }
           });
@@ -235,21 +286,6 @@ export async function POST(req: NextRequest) {
           return false;
         }
 
-        case 'apply_break_penalty': {
-          const teamId = payload.teamId;
-          if (typeof teamId !== 'string') {
-            return false;
-          }
-
-          const team = currentRoom.teams.find((candidate) => candidate.id === teamId);
-          if (team && team.powerFlags.takeBreakAvailable) {
-            team.energy = Math.max(0, team.energy - 1);
-            team.powerFlags.takeBreakAvailable = false;
-            return true;
-          }
-
-          return false;
-        }
       }
 
       return false;

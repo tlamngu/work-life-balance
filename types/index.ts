@@ -1,7 +1,7 @@
 export type TeamId = string;
 export type RoomCode = string;
 
-export const STATEMENT_COUNT = 4;
+export const STATEMENT_COUNT = 3;
 
 export interface Team {
   id: TeamId;
@@ -18,7 +18,7 @@ export type Phase = 'LOBBY' | 'SPEAKER_PREP' | 'GUESSING' | 'REVEAL' | 'SCORED' 
 
 export interface SpeakerContent {
   statementCount: number;
-  fakeIndex: number; // 0, 1, 2, or 3
+  fakeIndex: number; // 0, 1, or 2
 }
 
 export interface RoundState {
@@ -30,7 +30,8 @@ export interface RoundState {
     phaseEndsAt: number; // Timestamp
     duration: number; // Total duration for progress bar
   } | null;
-  votes: Record<TeamId, number>; // TeamId -> Index (0, 1, 2, 3)
+  votes: Record<TeamId, number>; // TeamId -> Index (0, 1, 2)
+  breakTargets: Record<TeamId, TeamId>; // Source team -> target team for Break
   revealed: boolean;
 }
 

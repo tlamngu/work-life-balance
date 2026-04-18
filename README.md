@@ -9,7 +9,7 @@ Multiplayer party game about work-life balance, built with Next.js.
   - Select which statement number is fake.
   - Submit fake choice.
 - Voter flow:
-  - Pick `1`, `2`, `3`, or `4` (statement index).
+   - Pick `1`, `2`, or `3` (statement index).
 
 ## Reliability model
 

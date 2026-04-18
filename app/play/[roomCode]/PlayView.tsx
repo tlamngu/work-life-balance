@@ -13,6 +13,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
 
   // Speaker Selection State
   const [selectedFakeChoice, setSelectedFakeChoice] = useState<{ roundIndex: number; fakeIndex: number } | null>(null);
+  const [selectedBreakChoice, setSelectedBreakChoice] = useState<{ roundIndex: number; teamId: string } | null>(null);
+  const [selectedBoostChoice, setSelectedBoostChoice] = useState<{ roundIndex: number; teamId: string } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(`energy_bar_team_${roomCode}`);
@@ -48,6 +50,12 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   const selectedFakeIndex = selectedFakeChoice && selectedFakeChoice.roundIndex === currentRoundIndex
     ? selectedFakeChoice.fakeIndex
     : null;
+  const selectedBreakTargetId = selectedBreakChoice && selectedBreakChoice.roundIndex === currentRoundIndex
+    ? selectedBreakChoice.teamId
+    : '';
+  const selectedBoostTargetId = selectedBoostChoice && selectedBoostChoice.roundIndex === currentRoundIndex
+    ? selectedBoostChoice.teamId
+    : '';
 
   const myTeam = teams.find(t => t.id === myTeamId);
 
@@ -126,6 +134,123 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
   // 3. Game Loop
   if (!round) return <div className="min-h-screen p-6 text-orange-950 flex items-center justify-center font-pixel-header">LOADING ROUND...</div>;
 
+  const renderTeamPowers = () => {
+    const roundBreakTargets = round.breakTargets ?? {};
+    const lockedBreakTargetId = roundBreakTargets[myTeam.id];
+    const lockedBreakTeam = teams.find((team) => team.id === lockedBreakTargetId);
+    const nextSpeakerTeamId = teams[(round.index + 1) % teams.length]?.id;
+
+    const breakTargetCandidates = teams.filter(
+      (team) => team.id !== myTeam.id && team.id !== nextSpeakerTeamId,
+    );
+    const boostTargetCandidates = teams.filter((team) => team.id !== myTeam.id);
+    const selectedBoostTeam = boostTargetCandidates.find((team) => team.id === selectedBoostTargetId);
+
+    return (
+      <section className="mt-8 w-full max-w-2xl mx-auto bg-white border-4 border-black p-5 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-left">
+        <h3 className="text-xl font-pixel-header text-black mb-2">TEAM POWERS</h3>
+        <p className="text-sm font-pixel-body text-orange-700 mb-4">
+          BREAK applies only if your chosen target voted wrong. You cannot target the next-round speaker.
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="border-4 border-black bg-blue-50 p-4">
+            <div className="text-sm font-pixel-header text-blue-700 mb-2">BREAK (UNLOCK: 3 ENERGY)</div>
+
+            {lockedBreakTeam ? (
+              <div className="font-pixel-body text-lg text-blue-900">
+                TARGET LOCKED: {lockedBreakTeam.name}
+              </div>
+            ) : myTeam.powerFlags.takeBreakAvailable ? (
+              <>
+                <select
+                  value={selectedBreakTargetId}
+                  onChange={(event) => {
+                    setSelectedBreakChoice({ roundIndex: round.index, teamId: event.target.value });
+                  }}
+                  className="w-full bg-white border-4 border-black p-2 font-pixel-body text-lg focus:outline-none"
+                >
+                  <option value="">SELECT TEAM</option>
+                  {breakTargetCandidates.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  disabled={
+                    round.phase !== 'GUESSING' ||
+                    !selectedBreakTargetId ||
+                    breakTargetCandidates.length === 0
+                  }
+                  onClick={() => {
+                    if (!selectedBreakTargetId) {
+                      return;
+                    }
+                    setSelectedBreakChoice(null);
+                    actions.setBreakTarget(myTeam.id, selectedBreakTargetId);
+                  }}
+                  className="mt-3 w-full border-4 border-black bg-blue-300 p-2 font-pixel-header text-black hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  LOCK BREAK TARGET
+                </button>
+
+                {round.phase !== 'GUESSING' && (
+                  <p className="mt-2 text-xs font-pixel-body text-blue-700">BREAK TARGETING IS OPEN DURING GUESSING.</p>
+                )}
+                {breakTargetCandidates.length === 0 && (
+                  <p className="mt-2 text-xs font-pixel-body text-blue-700">NO VALID TARGET THIS ROUND.</p>
+                )}
+              </>
+            ) : (
+              <div className="font-pixel-body text-sm text-blue-700">UNAVAILABLE (NEED 3 ENERGY)</div>
+            )}
+          </div>
+
+          <div className="border-4 border-black bg-yellow-50 p-4">
+            <div className="text-sm font-pixel-header text-yellow-700 mb-2">BOOST (UNLOCK: 5 ENERGY)</div>
+
+            {myTeam.powerFlags.boostAvailable ? (
+              <>
+                <select
+                  value={selectedBoostTargetId}
+                  onChange={(event) => {
+                    setSelectedBoostChoice({ roundIndex: round.index, teamId: event.target.value });
+                  }}
+                  className="w-full bg-white border-4 border-black p-2 font-pixel-body text-lg focus:outline-none"
+                >
+                  <option value="">SELECT TEAM</option>
+                  {boostTargetCandidates.map((team) => (
+                    <option key={team.id} value={team.id} disabled={team.energy <= 0}>
+                      {team.name} ({team.energy})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  disabled={!selectedBoostTeam || selectedBoostTeam.energy <= 0}
+                  onClick={() => {
+                    if (!selectedBoostTeam || selectedBoostTeam.energy <= 0) {
+                      return;
+                    }
+                    setSelectedBoostChoice(null);
+                    actions.useBoost(myTeam.id, selectedBoostTeam.id);
+                  }}
+                  className="mt-3 w-full border-4 border-black bg-yellow-300 p-2 font-pixel-header text-black hover:bg-yellow-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  STEAL 1 ENERGY
+                </button>
+              </>
+            ) : (
+              <div className="font-pixel-body text-sm text-yellow-700">UNAVAILABLE (NEED 5 ENERGY)</div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const isSpeaker = round.speakerTeamId === myTeamId;
 
   // SPEAKER VIEW
@@ -136,7 +261,7 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
           <header className="mb-6 text-center">
             <h2 className="text-lg font-pixel-header text-orange-600 mb-2">YOU ARE THE SPEAKER</h2>
             <p className="text-orange-800 text-lg font-pixel-body">
-              Speak 4 statements out loud in the real world.<br />
+              Speak {STATEMENT_COUNT} statements out loud in the real world.<br />
               Pick which statement number is fake, then submit.
             </p>
           </header>
@@ -177,6 +302,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
               TIP: KEEP A POKER FACE! DON&apos;T LET THEM GUESS.
             </p>
           </div>
+
+          {renderTeamPowers()}
         </div>
       );
     }
@@ -199,6 +326,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
         <div className="mt-8 p-4 bg-orange-100 border-4 border-black text-orange-800 font-pixel-body text-lg">
           WAIT FOR TEAMS TO VOTE...
         </div>
+
+        {renderTeamPowers()}
       </div>
     );
   }
@@ -249,6 +378,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
             ))}
           </div>
         )}
+
+        {renderTeamPowers()}
       </div>
     );
   }
@@ -284,6 +415,8 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
            <div className="text-sm text-orange-500 font-pixel-header mb-2">CURRENT ENERGY</div>
            <div className="text-6xl font-pixel-header text-yellow-500 drop-shadow-md">{myTeam.energy}/7</div>
         </div>
+
+        {renderTeamPowers()}
       </div>
     );
   }
