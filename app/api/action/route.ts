@@ -15,6 +15,8 @@ const SUPPORTED_ACTIONS = new Set([
   'create_room',
   'add_team',
   'start_game',
+  'restart_game',
+  'end_game',
   'submit_fake_statement',
   'submit_statements',
   'cast_vote',
@@ -82,6 +84,39 @@ export async function POST(req: NextRequest) {
           return true;
         }
 
+        case 'restart_game': {
+          if (currentRoom.teams.length < 2) {
+            return false;
+          }
+
+          currentRoom.teams = currentRoom.teams.map((team) => ({
+            ...team,
+            energy: 0,
+            powerFlags: {
+              takeBreakAvailable: false,
+              boostAvailable: false,
+            },
+          }));
+          currentRoom.winnerTeamId = null;
+          currentRoom.status = 'PLAYING';
+          startRound(currentRoom, 0);
+          return true;
+        }
+
+        case 'end_game': {
+          if (currentRoom.status === 'ENDED' && currentRoom.round?.phase === 'GAME_OVER') {
+            return false;
+          }
+
+          currentRoom.status = 'ENDED';
+          if (currentRoom.round) {
+            currentRoom.round.phase = 'GAME_OVER';
+            currentRoom.round.timer = null;
+            currentRoom.round.revealed = true;
+          }
+          return true;
+        }
+
         case 'submit_fake_statement':
         case 'submit_statements': {
           if (!currentRoom.round || currentRoom.round.phase !== 'SPEAKER_PREP') {
@@ -135,7 +170,10 @@ export async function POST(req: NextRequest) {
         }
 
         case 'set_break_target': {
-          if (!currentRoom.round || currentRoom.round.phase !== 'GUESSING') {
+          if (
+            !currentRoom.round ||
+            (currentRoom.round.phase !== 'SPEAKER_PREP' && currentRoom.round.phase !== 'GUESSING')
+          ) {
             return false;
           }
 

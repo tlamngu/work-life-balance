@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useGame } from '@/hooks/useGame';
 import { STATEMENT_COUNT } from '@/types';
 import { LuUsers, LuPlay, LuEye, LuArrowRight, LuZap, LuCoffee, LuQrCode, LuX } from 'react-icons/lu';
@@ -10,6 +11,7 @@ const statementIndexes = Array.from({ length: STATEMENT_COUNT }, (_, index) => i
 
 export default function MCView({ roomCode }: { roomCode: string }) {
   const { roomState, isConnected, actions } = useGame(roomCode);
+  const router = useRouter();
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamSlogan, setNewTeamSlogan] = useState('');
   const [showQR, setShowQR] = useState(false);
@@ -19,6 +21,7 @@ export default function MCView({ roomCode }: { roomCode: string }) {
 
   const { teams, status, round } = roomState;
   const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${roomCode}` : '';
+  const winnerTeam = teams.find((team) => team.id === roomState.winnerTeamId);
 
   if (status === 'LOBBY') {
     return (
@@ -260,6 +263,52 @@ export default function MCView({ roomCode }: { roomCode: string }) {
                   );
                 })}
              </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'ENDED') {
+    return (
+      <div className="min-h-screen p-6 text-orange-950 font-pixel-body">
+        <header className="mb-8 flex items-center justify-between border-b-4 border-black pb-4 bg-white p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <div>
+            <h1 className="text-2xl font-pixel-header text-orange-600">MC PANEL</h1>
+            <div className="mt-2 text-sm font-pixel-header text-orange-500">ROOM CODE: {roomCode}</div>
+          </div>
+          <button
+            onClick={() => window.open(`/board/${roomCode}`, 'boardView', 'width=1024,height=768')}
+            className="bg-indigo-500 text-white px-4 py-3 hover:bg-indigo-600 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-2 font-pixel-header whitespace-nowrap"
+            title="Open Presentation Screen (Pop-out Window)"
+          >
+            <LuEye size={20} /> DASHBOARD
+          </button>
+        </header>
+
+        <div className="max-w-3xl mx-auto bg-white border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center">
+          <div className="text-4xl font-pixel-header text-black mb-2">CONGRATULATIONS</div>
+          <div className="text-2xl font-pixel-body text-orange-800 mb-8">
+            {winnerTeam ? `${winnerTeam.name} WINS THE GAME!` : 'A TEAM HAS WON THE GAME!'}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <button
+              onClick={actions.restartGame}
+              className="h-16 bg-green-500 text-xl font-pixel-header text-white border-4 border-black hover:bg-green-400 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all"
+            >
+              RESTART GAME
+            </button>
+
+            <button
+              onClick={() => {
+                actions.endGame();
+                router.push('/');
+              }}
+              className="h-16 bg-gray-800 text-xl font-pixel-header text-white border-4 border-black hover:bg-gray-700 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-none transition-all"
+            >
+              END SESSION
+            </button>
           </div>
         </div>
       </div>

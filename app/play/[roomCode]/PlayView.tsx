@@ -131,6 +131,29 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
     );
   }
 
+  if (status === 'ENDED') {
+    const winnerTeam = teams.find((team) => team.id === roomState.winnerTeamId);
+
+    return (
+      <div className="min-h-screen p-6 text-orange-950 flex flex-col items-center justify-center text-center">
+        <div className="h-28 w-28 bg-yellow-300 border-4 border-black flex items-center justify-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-6">
+          <LuZap className="h-14 w-14 text-orange-700" />
+        </div>
+        <h1 className="text-4xl font-pixel-header text-black mb-3">GAME COMPLETE</h1>
+        <p className="text-2xl font-pixel-body text-orange-800 mb-8">
+          {winnerTeam ? `${winnerTeam.name} WON THE MATCH!` : 'A WINNER HAS BEEN DECIDED!'}
+        </p>
+
+        <div className="w-full max-w-lg bg-white border-4 border-black p-5 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-sm font-pixel-header text-orange-600 mb-2">WAITING FOR MC</p>
+          <p className="font-pixel-body text-lg text-black">
+            The MC can restart this room or end the session.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // 3. Game Loop
   if (!round) return <div className="min-h-screen p-6 text-orange-950 flex items-center justify-center font-pixel-header">LOADING ROUND...</div>;
 
@@ -139,6 +162,7 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
     const lockedBreakTargetId = roundBreakTargets[myTeam.id];
     const lockedBreakTeam = teams.find((team) => team.id === lockedBreakTargetId);
     const nextSpeakerTeamId = teams[(round.index + 1) % teams.length]?.id;
+    const canLockBreakNow = round.phase === 'SPEAKER_PREP' || round.phase === 'GUESSING';
 
     const breakTargetCandidates = teams.filter(
       (team) => team.id !== myTeam.id && team.id !== nextSpeakerTeamId,
@@ -180,7 +204,7 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
 
                 <button
                   disabled={
-                    round.phase !== 'GUESSING' ||
+                    !canLockBreakNow ||
                     !selectedBreakTargetId ||
                     breakTargetCandidates.length === 0
                   }
@@ -196,11 +220,11 @@ export default function PlayView({ roomCode }: { roomCode: string }) {
                   LOCK BREAK TARGET
                 </button>
 
-                {round.phase !== 'GUESSING' && (
-                  <p className="mt-2 text-xs font-pixel-body text-blue-700">BREAK TARGETING IS OPEN DURING GUESSING.</p>
+                {!canLockBreakNow && (
+                  <p className="mt-2 text-xs font-pixel-body text-blue-700">BREAK TARGETING IS OPEN DURING PREP OR GUESSING.</p>
                 )}
                 {breakTargetCandidates.length === 0 && (
-                  <p className="mt-2 text-xs font-pixel-body text-blue-700">NO VALID TARGET THIS ROUND.</p>
+                  <p className="mt-2 text-xs font-pixel-body text-blue-700">NO VALID TARGET THIS ROUND. YOU NEED 3+ TEAMS FOR THIS RULE.</p>
                 )}
               </>
             ) : (

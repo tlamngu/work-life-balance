@@ -15,6 +15,7 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
 
   const { teams, round, status } = roomState;
   const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${roomCode}` : '';
+  const winnerTeam = teams.find((team) => team.id === roomState.winnerTeamId);
 
   return (
     <div className="min-h-screen p-8 text-orange-950 font-pixel-body overflow-hidden flex flex-col">
@@ -194,6 +195,20 @@ export default function BoardView({ roomCode }: { roomCode: string }) {
                    )
                })}
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {status === 'ENDED' ? (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-8 backdrop-blur-sm">
+          <div className="bg-white border-8 border-black p-8 w-full max-w-4xl shadow-[16px_16px_0px_0px_rgba(255,165,0,1)] text-center">
+            <h2 className="text-6xl font-pixel-header text-black mb-4">CONGRATULATIONS!</h2>
+            <p className="text-3xl font-pixel-body text-orange-800 mb-4">
+              {winnerTeam ? `${winnerTeam.name} WINS!` : 'A TEAM WINS!'}
+            </p>
+            <p className="text-lg font-pixel-body text-black">
+              MC is deciding to restart or end the session.
+            </p>
           </div>
         </div>
       ) : null}

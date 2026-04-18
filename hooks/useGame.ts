@@ -78,6 +78,12 @@ export const useGame = (roomCode: string) => {
     startGame: () => {
       postAction('start_game');
     },
+    restartGame: () => {
+      postAction('restart_game');
+    },
+    endGame: () => {
+      postAction('end_game');
+    },
     submitFakeStatement: (fakeIndex: number) => {
       postAction('submit_fake_statement', { fakeIndex });
     },

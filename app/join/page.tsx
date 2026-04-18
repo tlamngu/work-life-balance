@@ -11,10 +11,15 @@ export default function JoinPage() {
   const [isScanning, setIsScanning] = useState(false);
   const router = useRouter();
 
+  const normalizeRoomCode = (value: string) => {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.length > 0) {
-      router.push(`/play/${code.toUpperCase()}`);
+    const roomCode = normalizeRoomCode(code);
+    if (roomCode.length > 0) {
+      router.push(`/play/${roomCode}`);
     }
   };
 
@@ -23,12 +28,12 @@ export default function JoinPage() {
       const scannedValue = result[0].rawValue;
       // Extract room code if it's a URL
       const match = scannedValue.match(/\/play\/([A-Z0-9]+)/i);
-      const roomCode = match ? match[1] : scannedValue;
+      const roomCode = normalizeRoomCode(match ? match[1] : scannedValue);
       
       if (roomCode) {
-        setCode(roomCode.toUpperCase());
+        setCode(roomCode);
         setIsScanning(false);
-        router.push(`/play/${roomCode.toUpperCase()}`);
+        router.push(`/play/${roomCode}`);
       }
     }
   };
@@ -64,20 +69,21 @@ export default function JoinPage() {
       <form onSubmit={handleSubmit} className="w-full max-w-md space-y-8 bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative z-10">
         <h1 className="text-3xl font-pixel-header text-center text-orange-600">JOIN GAME</h1>
         
-        <div className="space-y-4">
+        <div className="space-y-4 w-full" >
           <label className="block text-lg font-pixel-body font-bold">ROOM CODE:</label>
-          <div className="flex gap-2">
+          <div className="flex items-stretch gap-2 w-full min-w-0">
             <input
               type="text"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(normalizeRoomCode(e.target.value))}
               placeholder="XK9F2A"
-              className="flex-1 border-4 border-black bg-orange-50 p-4 text-center text-3xl font-pixel-header tracking-widest uppercase placeholder:text-orange-200 focus:outline-none focus:bg-white"
+              maxLength={8}
+              className="min-w-0 w-full border-4 border-black bg-orange-50 p-4 text-center text-2xl sm:text-3xl font-pixel-header tracking-[0.2em] uppercase placeholder:text-orange-200 focus:outline-none focus:bg-white"
             />
             <button
               type="button"
               onClick={() => setIsScanning(true)}
-              className="bg-orange-100 border-4 border-black p-4 hover:bg-orange-200 active:bg-orange-300 transition-colors"
+              className="shrink-0 bg-orange-100 border-4 border-black p-4 hover:bg-orange-200 active:bg-orange-300 transition-colors"
               title="Scan QR Code"
             >
               <LuScan className="h-8 w-8 text-orange-800" />
